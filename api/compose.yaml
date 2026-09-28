@@ -1,0 +1,31 @@
+# Local development only. Spring Boot starts these containers on bootRun
+# and stops them on shutdown. The credentials below never leave this machine.
+services:
+  postgres:
+    image: 'pgvector/pgvector:pg17'
+    environment:
+      - 'POSTGRES_DB=aurae'
+      - 'POSTGRES_USER=aurae'
+      - 'POSTGRES_PASSWORD=aurae'
+    ports:
+      - '5432'
+    volumes:
+      - 'postgres-data:/var/lib/postgresql/data'
+    labels:
+      # The pgvector image is not a name Spring Boot recognises on its own.
+      org.springframework.boot.service-connection: postgres
+
+  keycloak:
+    image: 'quay.io/keycloak/keycloak:26.4'
+    # Imports the aurae realm with its client, roles and test users on first start.
+    command: ['start-dev', '--import-realm']
+    volumes:
+      - './keycloak:/opt/keycloak/data/import:ro'
+    environment:
+      - 'KC_BOOTSTRAP_ADMIN_USERNAME=admin'
+      - 'KC_BOOTSTRAP_ADMIN_PASSWORD=admin'
+    ports:
+      - '8180:8080'
+
+volumes:
+  postgres-data:

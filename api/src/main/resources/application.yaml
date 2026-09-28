@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: aurae
+  security:
+    oauth2:
+      client:
+        # Any OpenID Connect provider works: Keycloak by default, or a clinic's own such as Entra ID.
+        registration:
+          oidc:
+            provider: oidc
+            client-id: ${aurae.oidc.client-id}
+            client-secret: ${aurae.oidc.client-secret}
+            scope: openid,profile,email
+        provider:
+          oidc:
+            issuer-uri: ${aurae.oidc.issuer-uri}
+            user-name-attribute: preferred_username
+
+server:
+  servlet:
+    session:
+      # Practice PCs are shared. An idle session ends after 15 minutes.
+      timeout: 15m
+      cookie:
+        http-only: true
+        secure: true
+        same-site: lax
+
+aurae:
+  oidc:
+    issuer-uri: ${AURAE_OIDC_ISSUER_URI:}
+    client-id: ${AURAE_OIDC_CLIENT_ID:}
+    client-secret: ${AURAE_OIDC_CLIENT_SECRET:}
+  security:
+    # Where the provider puts roles in the ID token, and how its role names map to Aurae's.
+    role-claim: roles
+    role-mapping:
+      mfa: MFA
+      gp: GP
+      admin: ADMIN

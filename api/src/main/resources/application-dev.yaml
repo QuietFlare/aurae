@@ -1,0 +1,14 @@
+# Local development only, switched on by bootRun. These values match api/keycloak/aurae-realm.json.
+# A practice installation sets the AURAE_OIDC_* variables instead and never runs this profile.
+aurae:
+  oidc:
+    issuer-uri: http://localhost:8180/realms/aurae
+    client-id: aurae-web
+    client-secret: dev-d7f1ea548ed66707
+
+server:
+  servlet:
+    session:
+      cookie:
+        # Browsers accept Secure cookies on localhost, but plain http tools such as curl do not send them.
+        secure: false

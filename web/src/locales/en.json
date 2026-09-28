@@ -1,0 +1,18 @@
+{
+  "app": {
+    "name": "Aurae",
+    "language": "Language"
+  },
+  "status": {
+    "title": "Server status",
+    "checking": "Checking",
+    "up": "Running",
+    "down": "Not reachable"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signedInAs": "Signed in as {{name}}",
+    "roles": "Roles"
+  }
+}

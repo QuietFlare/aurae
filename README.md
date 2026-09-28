@@ -12,7 +12,7 @@ Aurae organises and displays lab data. It shows whether a value lies inside or o
 
 ## Stack
 
-React With Typescript on Vite, Kotlin, Spring Boot, PostgreSQL, Docker, Keycloak and Kubernetes (k3s).
+React with TypeScript on Vite, Kotlin, Spring Boot, PostgreSQL, Docker, Keycloak and Kubernetes (k3s).
 
 The application builds to one container image. That image runs unchanged under Docker Compose for development and under k3s for a practice. All configuration comes in through environment variables, and Spring Actuator provides the health endpoints k3s uses as probes. The two environments differ only on the platform side: secrets, TLS and ingress, and volumes. A practice that cannot run k3s runs the same image with Compose.
 
