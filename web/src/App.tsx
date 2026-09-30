@@ -3,12 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { supportedLanguages } from './i18n'
 
 type Status = 'checking' | 'up' | 'down'
-type Me = { username: string; name: string | null; roles: string[] }
-
-// Spring sets this cookie. It is readable on purpose: it proves a request came from our own page.
-function csrfToken(): string {
-  return document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/)?.[1] ?? ''
-}
+type Me = { username: string; name: string | null; roles: string[]; permissions: string[]; csrfToken: string }
 
 function App() {
   const { t, i18n } = useTranslation()
@@ -48,7 +43,7 @@ function App() {
           {me && (
             // A plain form post, so the browser can follow the redirect to Keycloak's sign-out page.
             <form method="post" action="/logout">
-              <input type="hidden" name="_csrf" value={csrfToken()} />
+              <input type="hidden" name="_csrf" value={me.csrfToken} />
               <button type="submit">{t('auth.signOut')}</button>
             </form>
           )}

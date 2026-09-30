@@ -16,6 +16,24 @@ React with TypeScript on Vite, Kotlin, Spring Boot, PostgreSQL, Docker, Keycloak
 
 The application builds to one container image. That image runs unchanged under Docker Compose for development and under k3s for a practice. All configuration comes in through environment variables, and Spring Actuator provides the health endpoints k3s uses as probes. The two environments differ only on the platform side: secrets, TLS and ingress, and volumes. A practice that cannot run k3s runs the same image with Compose.
 
+## Identity and access
+
+Aurae signs users in with OpenID Connect on OAuth 2.0, using the authorization code flow with PKCE that current OAuth security guidance (RFC 9700) recommends. It works with any OpenID Connect provider. Keycloak ships as the default, and the same build has been tested against Amazon Cognito with no code changes.
+
+- The backend performs the sign-in and keeps all tokens on the server. The browser only holds an HttpOnly session cookie that page scripts cannot read.
+- Aurae never sees a password. Users sign in on the provider's page, so two-factor login and a clinic's existing Microsoft or Active Directory accounts keep working.
+- Endpoints check named permissions, never role names. Which role holds which permission, and where the provider puts roles in its token, is configuration.
+- Every sign-in asks for the password, and an idle session ends after 15 minutes, because practice PCs are shared.
+- There is no self-registration. An admin invites each user.
+- The bundled Keycloak asks every new user to set up a one-time code app and requires passwords of 12 characters or more. A clinic that brings its own provider sets these rules there.
+- An installation serves https only. A reverse proxy holds the certificate, and Keycloak runs in production mode behind it with its own database.
+- The repository holds no secrets, only templates. Each installation generates its own.
+
+Known limits, planned for later:
+
+- Sessions live in the server's memory. That fits one Aurae instance per practice. Running several instances behind a load balancer needs the sessions in PostgreSQL first.
+- Aurae checks the provider's configuration at startup and refuses to start while the provider is unreachable. In Kubernetes it must wait for Keycloak.
+
 ## License
 
 Aurae is licensed under the GNU AGPL v3.0. See [LICENSE](LICENSE).

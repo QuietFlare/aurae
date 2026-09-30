@@ -1,0 +1,3 @@
+handle /auth/* {
+	reverse_proxy keycloak:8080
+}
