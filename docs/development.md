@@ -2,11 +2,21 @@
 
 ## Running locally
 
+Once, after cloning, generate the local secrets:
+
+```bash
+bash scripts/dev-setup.sh
+```
+
+It writes `api/keycloak/aurae-realm.json` and `api/config/application-dev.yaml` from templates, with random values. Git ignores both. Test users and their passwords are in the realm file.
+
+Then start everything:
+
 ```bash
 cd api && ./gradlew bootRun
 ```
 
-This starts Postgres and Keycloak through `api/compose.yaml`, activates the `dev` profile, builds the frontend if it changed, and serves everything on `http://localhost:8080`. Test users and their passwords are in `api/keycloak/aurae-realm.json`.
+This starts Postgres and Keycloak through `api/compose.yaml`, activates the `dev` profile, builds the frontend if it changed, and serves everything on `http://localhost:8080`.
 
 For quick frontend work, also run `npm run dev` in `web/` and open `http://localhost:5173`. Vite updates the page on every save and forwards API and sign-in calls to Spring.
 
@@ -22,9 +32,9 @@ For quick frontend work, also run `npm run dev` in `web/` and open `http://local
 
 `bootRun` sets `spring.profiles.active=dev`, and Spring then loads `application-dev.yaml` by its name alone. Starting `main` from the IDE skips Gradle, so the app fails to find Keycloak. Set the active profile to `dev` in the IDE's run configuration.
 
-### Spring does not start Compose if something is already running
+### Spring skips Compose by default if something is already running
 
-When any service from `api/compose.yaml` is already up, Spring assumes the whole stack is running and skips `docker compose up`. If Keycloak is down while Postgres is up, the app fails at startup with an `UnsatisfiedDependencyException` on `securityFilterChain`. Start the missing service yourself.
+By default, when any service from `api/compose.yaml` is already up, Spring assumes the whole stack is running and skips `docker compose up`. A stopped Keycloak then fails startup with an `UnsatisfiedDependencyException` on `securityFilterChain`, and a stopped Postgres with `Failed to configure a DataSource: 'url' attribute is not specified`. The dev profile sets `spring.docker.compose.start.skip: never`, so `bootRun` always runs `docker compose up`, which starts only what is missing. Starting the app another way still needs the services up.
 
 ### The app needs Keycloak at startup
 
@@ -44,15 +54,19 @@ cd api && docker compose up -d --force-recreate keycloak
 
 ### The client secret lives in two files
 
-`api/keycloak/aurae-realm.json` and `api/src/main/resources/application-dev.yaml` must hold the same secret. If they differ, sign-in fails with `invalid_client`. Both values work only against the Keycloak on your own machine.
+`api/keycloak/aurae-realm.json` and `api/config/application-dev.yaml` must hold the same secret. `scripts/dev-setup.sh` writes both at once. If they differ, sign-in fails with `invalid_client`. After `dev-setup.sh --force`, recreate Keycloak so it imports the new values. The deploy Compose stack does not use this file. Its realm is `deploy/keycloak/aurae-realm.json`, without users, and its secret comes from `.env`.
 
 ### Roles are read at sign-in
 
 Aurae maps the provider's roles once, when the user signs in. After changing a user's roles in Keycloak, sign out and in again.
 
-### Ports are shared between Compose projects
+### The two stacks use different addresses
 
-Both Compose files publish Keycloak on host port 8180. Stop one stack before starting the other, or Docker reports `port is already allocated` and leaves containers half-created.
+Development serves plain http on `localhost:8080`, with Keycloak on port 8180. The deploy stack publishes only ports 80 and 443 and serves https on the name in `AURAE_HOST`, with Keycloak under `/auth`. See `deploy/compose/README.md`.
+
+### Test users skip two-factor sign-in
+
+The development realm enforces the password policy but does not ask test users for a one-time code, so sign-in stays quick. The deploy realm asks every new user to set one up.
 
 ### Only the built frontend is in the JAR
 

@@ -1,0 +1,10 @@
+# Terminates https for the whole installation. Everything behind it speaks plain http on the
+# Compose network, which no other machine can reach.
+{$AURAE_HOST} {
+	tls /tls/server.crt /tls/server.key
+
+	# Routes an identity provider file adds, such as the bundled Keycloak under /auth.
+	import routes/*.caddy
+
+	reverse_proxy aurae:8080
+}

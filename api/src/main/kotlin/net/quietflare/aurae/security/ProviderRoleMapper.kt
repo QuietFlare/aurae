@@ -6,19 +6,28 @@ import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMap
 import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority
 import org.springframework.stereotype.Component
 
-/** Turns the provider's role claim into Aurae roles (ROLE_MFA, ROLE_GP, ROLE_ADMIN) at sign-in. */
+/**
+ * At sign-in, turns the provider's role claim into Aurae roles (ROLE_MFA, ROLE_GP, ROLE_ADMIN)
+ * and each role into its permissions (report:upload and so on).
+ */
 @Component
 class ProviderRoleMapper(private val properties: SecurityProperties) : GrantedAuthoritiesMapper {
 
     override fun mapAuthorities(authorities: Collection<GrantedAuthority>): Collection<GrantedAuthority> {
-        val providerRoles = authorities
+        val auraeRoles = authorities
             .filterIsInstance<OidcUserAuthority>()
             .flatMap { it.idToken.getClaimAsStringList(properties.roleClaim).orEmpty() }
-
-        val auraeRoles = providerRoles
             .mapNotNull { properties.roleMapping[it] }
-            .map { SimpleGrantedAuthority("ROLE_$it") }
+            .toSet()
 
-        return authorities + auraeRoles
+        val permissions = auraeRoles.flatMap { permissionsOf(it) }.toSet()
+
+        return authorities +
+            auraeRoles.map { SimpleGrantedAuthority("ROLE_$it") } +
+            permissions.map { SimpleGrantedAuthority(it) }
     }
+
+    // Configuration keys may arrive lower-cased, for example from environment variables.
+    private fun permissionsOf(role: String): Set<String> =
+        properties.rolePermissions.entries.firstOrNull { it.key.equals(role, ignoreCase = true) }?.value.orEmpty()
 }

@@ -1,10 +1,19 @@
 # Local development only, switched on by bootRun. These values match api/keycloak/aurae-realm.json.
 # A practice installation sets the AURAE_OIDC_* variables instead and never runs this profile.
+# The client secret is not here: scripts/dev-setup.sh writes it to api/config/application-dev.yaml,
+# which Git ignores and Spring loads on top of this file.
 aurae:
   oidc:
     issuer-uri: http://localhost:8180/realms/aurae
     client-id: aurae-web
-    client-secret: dev-d7f1ea548ed66707
+
+spring:
+  docker:
+    compose:
+      start:
+        # Always run "docker compose up", which starts only what is missing. The default skips it
+        # as soon as any service is running, so a stopped Postgres next to a running Keycloak stays down.
+        skip: never
 
 server:
   servlet:

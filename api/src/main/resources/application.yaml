@@ -14,7 +14,7 @@ spring:
         provider:
           oidc:
             issuer-uri: ${aurae.oidc.issuer-uri}
-            user-name-attribute: preferred_username
+            user-name-attribute: ${aurae.oidc.user-name-attribute}
 
 server:
   servlet:
@@ -31,10 +31,31 @@ aurae:
     issuer-uri: ${AURAE_OIDC_ISSUER_URI:}
     client-id: ${AURAE_OIDC_CLIENT_ID:}
     client-secret: ${AURAE_OIDC_CLIENT_SECRET:}
+    # The user-info field that holds the username. Cognito calls it "username".
+    user-name-attribute: ${AURAE_OIDC_USER_NAME_ATTRIBUTE:preferred_username}
   security:
+    # Ask for the password on every sign-in. Practice PCs are shared.
+    force-login: true
     # Where the provider puts roles in the ID token, and how its role names map to Aurae's.
     role-claim: roles
     role-mapping:
       mfa: MFA
       gp: GP
       admin: ADMIN
+    # Who may do what. MFA and GP share the clinical work. The admin sees no medical data.
+    role-permissions:
+      MFA:
+        - 'report:upload'
+        - 'report:review'
+        - 'report:send-to-pvs'
+        - 'patient-values:read'
+        - 'report-original:read'
+      GP:
+        - 'report:upload'
+        - 'report:review'
+        - 'report:send-to-pvs'
+        - 'patient-values:read'
+        - 'report-original:read'
+      ADMIN:
+        - 'users:manage'
+        - 'audit:read'

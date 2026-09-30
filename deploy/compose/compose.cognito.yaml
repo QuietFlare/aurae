@@ -1,0 +1,7 @@
+# Identity provider: the AWS Cognito test pool. Its settings, including the client secret, come
+# from .env.cognito, which deploy/terraform/identity/aws-cognito writes and Git ignores.
+services:
+  aurae:
+    env_file:
+      - path: '.env.cognito'
+        required: true

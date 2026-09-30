@@ -39,6 +39,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-validation-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -55,8 +57,24 @@ allOpen {
     annotation("jakarta.persistence.Embeddable")
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
+// ./gradlew test runs the fast tests and needs nothing else running.
+tasks.test {
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
+}
+
+// ./gradlew integrationTest runs the tests marked @IntegrationTest. They start the whole
+// application against a real Postgres in a container, so Docker must be running.
+tasks.register<Test>("integrationTest") {
+    group = "verification"
+    description = "Runs the tests that need Docker."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    shouldRunAfter(tasks.test)
 }
 
 // The React frontend is built by Vite and served by Spring from classpath:/static, so one image
@@ -82,6 +100,17 @@ tasks.bootRun {
     systemProperty("spring.profiles.active", "dev")
 }
 
+// ./gradlew bootBuildImage builds the image locally. Add --publishImage to push it to GitHub's
+// registry as well, with credentials from the environment:
+//   GHCR_USER=<github user> GHCR_TOKEN=$(gh auth token) ./gradlew bootBuildImage --publishImage
 tasks.bootBuildImage {
     imageName = "ghcr.io/quietflare/aurae:${project.version}"
+    docker {
+        // The registry comes from the image name. The credentials are only read when set, so a
+        // plain local build needs none.
+        publishRegistry {
+            username = providers.environmentVariable("GHCR_USER")
+            password = providers.environmentVariable("GHCR_TOKEN")
+        }
+    }
 }

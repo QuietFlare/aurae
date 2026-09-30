@@ -1,31 +1,48 @@
 # Runs the full Aurae stack from built images, the way a practice without k3s would.
 # Development uses api/compose.yaml instead, where the app runs from your IDE.
-# Secrets come from a .env file next to this one. Copy .env.example to .env and fill it in.
+#
+# This file holds what every installation shares. The identity provider comes from a second file:
+#   compose.keycloak.yaml  the bundled Keycloak
+#   compose.cognito.yaml   the AWS Cognito test pool
+# .env picks one through COMPOSE_FILE, so "docker compose up -d" is enough. See README.md here.
 name: aurae
 
 services:
+  # The only container other machines can reach. It serves https on AURAE_HOST.
+  caddy:
+    image: 'caddy:2'
+    environment:
+      - 'AURAE_HOST=${AURAE_HOST:?set AURAE_HOST in .env}'
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - './caddy/Caddyfile:/etc/caddy/Caddyfile:ro'
+      - './tls/server:/tls:ro'
+      - 'caddy-data:/data'
+    networks:
+      default:
+        # Aurae reaches the identity provider under the same https address the browser uses,
+        # or the token check fails. Inside the Compose network that name leads here.
+        aliases:
+          - '${AURAE_HOST:?set AURAE_HOST in .env}'
+    restart: unless-stopped
+
   aurae:
     image: 'ghcr.io/quietflare/aurae:0.0.1-SNAPSHOT'
     environment:
       - 'SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/aurae'
       - 'SPRING_DATASOURCE_USERNAME=aurae'
       - 'SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}'
-      # The browser and this container must use the same Keycloak address, or the token check fails.
-      - 'AURAE_OIDC_ISSUER_URI=${KEYCLOAK_URL:?set KEYCLOAK_URL in .env}/realms/aurae'
-      - 'AURAE_OIDC_CLIENT_ID=aurae-web'
-      - 'AURAE_OIDC_CLIENT_SECRET=${AURAE_OIDC_CLIENT_SECRET:?set AURAE_OIDC_CLIENT_SECRET in .env}'
-      # Plain http only works for a local trial. A practice installation serves https and keeps this true.
-      - 'SERVER_SERVLET_SESSION_COOKIE_SECURE=${SECURE_COOKIES:-true}'
-    extra_hosts:
-      # Lets the container reach Keycloak under the same name the browser uses on this machine.
-      - 'keycloak.localhost:host-gateway'
-    ports:
-      - '8080:8080'
+      # Caddy tells Aurae the address the browser used, so redirects point to https.
+      - 'SERVER_FORWARD_HEADERS_STRATEGY=native'
+      # The image adds the certificates under this folder to the ones Java trusts at start.
+      - 'SERVICE_BINDING_ROOT=/bindings'
+    volumes:
+      - './tls/ca:/bindings/ca-certificates:ro'
     mem_limit: 1g
     depends_on:
       postgres:
-        condition: service_healthy
-      keycloak:
         condition: service_healthy
     restart: unless-stopped
 
@@ -43,26 +60,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  keycloak:
-    image: 'quay.io/keycloak/keycloak:26.4'
-    # Still the development realm with test users. A practice gets its own realm without them.
-    command: ['start-dev', '--import-realm']
-    volumes:
-      - '../../api/keycloak:/opt/keycloak/data/import:ro'
-    environment:
-      - 'KC_BOOTSTRAP_ADMIN_USERNAME=admin'
-      - 'KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}'
-      # Fixes the issuer in every token to this address, whoever asks.
-      - 'KC_HOSTNAME=${KEYCLOAK_URL:?set KEYCLOAK_URL in .env}'
-      - 'KC_HEALTH_ENABLED=true'
-    ports:
-      - '8180:8080'
-    healthcheck:
-      # The image has no curl, so the check talks HTTP to the management port through bash.
-      test: ['CMD-SHELL', "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
-      interval: 5s
-      retries: 30
-    restart: unless-stopped
-
 volumes:
   postgres-data:
+  caddy-data:

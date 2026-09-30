@@ -3,6 +3,9 @@
   "displayName": "Aurae (local development)",
   "enabled": true,
   "bruteForceProtected": true,
+  "passwordPolicy": "length(12) and notUsername and notEmail",
+  "ssoSessionIdleTimeout": 900,
+  "ssoSessionMaxLifespan": 36000,
   "roles": {
     "realm": [
       { "name": "mfa", "description": "Medical assistant: uploads and confirms outside reports" },
@@ -18,7 +21,7 @@
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "dev-d7f1ea548ed66707",
+      "secret": "__CLIENT_SECRET__",
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
@@ -55,7 +58,7 @@
       "lastName": "Assistant",
       "email": "mfa.test@example.invalid",
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "dev-7891a31abd982124", "temporary": false }],
+      "credentials": [{ "type": "password", "value": "__MFA_PASSWORD__", "temporary": false }],
       "realmRoles": ["mfa"]
     },
     {
@@ -65,7 +68,7 @@
       "lastName": "Doctor",
       "email": "gp.test@example.invalid",
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "dev-6c5218be2a81dda7", "temporary": false }],
+      "credentials": [{ "type": "password", "value": "__GP_PASSWORD__", "temporary": false }],
       "realmRoles": ["gp"]
     },
     {
@@ -75,7 +78,7 @@
       "lastName": "Admin",
       "email": "admin.test@example.invalid",
       "emailVerified": true,
-      "credentials": [{ "type": "password", "value": "dev-673111288e3b054b", "temporary": false }],
+      "credentials": [{ "type": "password", "value": "__ADMIN_PASSWORD__", "temporary": false }],
       "realmRoles": ["admin"]
     }
   ]

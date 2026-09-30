@@ -1,0 +1,83 @@
+# Identity provider: the bundled Keycloak in production mode, reachable only through Caddy
+# under /auth. The realm comes from deploy/keycloak/aurae-realm.json and holds no users.
+services:
+  aurae:
+    environment:
+      - 'AURAE_OIDC_ISSUER_URI=https://${AURAE_HOST:?set AURAE_HOST in .env}/auth/realms/aurae'
+      - 'AURAE_OIDC_CLIENT_ID=aurae-web'
+      - 'AURAE_OIDC_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:?set KEYCLOAK_CLIENT_SECRET in .env}'
+    depends_on:
+      # Aurae reads the realm's configuration when it starts, so the realm must exist first.
+      keycloak-config:
+        condition: service_completed_successfully
+
+  caddy:
+    volumes:
+      - './caddy/keycloak.caddy:/etc/caddy/routes/keycloak.caddy:ro'
+
+  keycloak:
+    image: 'quay.io/keycloak/keycloak:26.7'
+    command: ['start']
+    environment:
+      - 'KC_DB=postgres'
+      - 'KC_DB_URL=jdbc:postgresql://keycloak-postgres:5432/keycloak'
+      - 'KC_DB_USERNAME=keycloak'
+      - 'KC_DB_PASSWORD=${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}'
+      # Fixes the issuer in every token to this address, whoever asks.
+      - 'KC_HOSTNAME=https://${AURAE_HOST:?set AURAE_HOST in .env}/auth'
+      - 'KC_HTTP_RELATIVE_PATH=/auth'
+      # Caddy holds the certificate and forwards plain http with the original address in headers.
+      - 'KC_HTTP_ENABLED=true'
+      - 'KC_PROXY_HEADERS=xforwarded'
+      - 'KC_HEALTH_ENABLED=true'
+      # Used once, to create the first admin of the Keycloak console.
+      - 'KC_BOOTSTRAP_ADMIN_USERNAME=admin'
+      - 'KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}'
+    healthcheck:
+      # The image has no curl, so the check talks HTTP to the management port through bash. It
+      # reads the status line, because the body says UP for single checks while Keycloak still starts.
+      test: ['CMD-SHELL', "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
+      interval: 5s
+      retries: 60
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Applies the realm file on every start. Unlike Keycloak's own import it also updates a realm
+  # that already exists, so an upgrade reaches installed practices. It never touches users.
+  keycloak-config:
+    image: 'adorsys/keycloak-config-cli:6.5.1-26'
+    environment:
+      - 'KEYCLOAK_URL=http://keycloak:8080/auth'
+      - 'KEYCLOAK_USER=admin'
+      - 'KEYCLOAK_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}'
+      - 'IMPORT_FILES_LOCATIONS=/config/*'
+      - 'IMPORT_VARSUBSTITUTION_ENABLED=true'
+      # The realm file lists only the required action it changes. The others stay.
+      - 'IMPORT_MANAGED_REQUIRED_ACTION=no-delete'
+      - 'AURAE_URL=https://${AURAE_HOST:?set AURAE_HOST in .env}'
+      - 'KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:?set KEYCLOAK_CLIENT_SECRET in .env}'
+    volumes:
+      - '../keycloak:/config:ro'
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: 'no'
+
+  keycloak-postgres:
+    image: 'postgres:17'
+    environment:
+      - 'POSTGRES_DB=keycloak'
+      - 'POSTGRES_USER=keycloak'
+      - 'POSTGRES_PASSWORD=${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}'
+    volumes:
+      - 'keycloak-postgres-data:/var/lib/postgresql/data'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U keycloak -d keycloak']
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  keycloak-postgres-data:
