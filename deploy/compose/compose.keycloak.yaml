@@ -16,7 +16,7 @@ services:
       - './caddy/keycloak.caddy:/etc/caddy/routes/keycloak.caddy:ro'
 
   keycloak:
-    image: 'quay.io/keycloak/keycloak:26.4'
+    image: 'quay.io/keycloak/keycloak:26.7'
     command: ['start']
     environment:
       - 'KC_DB=postgres'
@@ -34,8 +34,9 @@ services:
       - 'KC_BOOTSTRAP_ADMIN_USERNAME=admin'
       - 'KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}'
     healthcheck:
-      # The image has no curl, so the check talks HTTP to the management port through bash.
-      test: ['CMD-SHELL', "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      # The image has no curl, so the check talks HTTP to the management port through bash. It
+      # reads the status line, because the body says UP for single checks while Keycloak still starts.
+      test: ['CMD-SHELL', "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
       interval: 5s
       retries: 60
     depends_on:
